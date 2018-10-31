@@ -4,6 +4,8 @@ import gym
 from gym import spaces, logger
 from gym.utils import seeding
 import numpy as np
+import math
+
 #import cupy as np
 
 class PuyoEnv(gym.Env):
@@ -32,6 +34,22 @@ class PuyoEnv(gym.Env):
             if (i // 4 == 0 and i % 4 == 3): continue
             if (i // 4 == (self.field_width - 1) and i % 4 == 1): continue
             self.action_space_to_line_rotate.append((i // 4, i % 4))
+        # 色数が足りなければ増やすこと
+        self.colors = np.array([
+            (1, 1, 1), # empty
+            (1, 0, 0),
+            (0, 1, 0),
+            (0, 0, 1),
+            (1, 1, 0),
+            (1, 0, 1),
+            (0, 1, 1),
+            (.5, 0, 0),
+            (0, .5, 0),
+            (0, 0, .5),
+            (.5, .5, 0),
+            (.5, 0, .5),
+            (0, .5, .5),
+        ], dtype=np.float)
 
     def set_seed(self, seed = None):
         if seed is None:
@@ -136,51 +154,74 @@ class PuyoEnv(gym.Env):
         obs = self.make_observation()
         return obs
 
-    #def render(self, mode='human'):
-    #    screen_width = 600
-    #    screen_height = 400
+    def _rect_geom(self, l, r, t, b):
+        return [(l,b), (l,t), (r,t), (r,b)]
 
-    #    world_width = self.x_threshold*2
-    #    scale = screen_width/world_width
-    #    carty = 100 # TOP OF CART
-    #    polewidth = 10.0
-    #    polelen = scale * 1.0
-    #    cartwidth = 50.0
-    #    cartheight = 30.0
+    def _draw_puyos(self, viewer, puyos, oxoy, puyo_size):
+        for col, rows in enumerate(puyos):
+            for row, color in enumerate(rows):
+                l,t = oxoy[0] + puyo_size * col, oxoy[1] + puyo_size * row
+                r,b = l + puyo_size, t + puyo_size
+                self.viewer.draw_polygon(self._rect_geom(l,r,t,b), color=self.colors[color])
 
-    #    if self.viewer is None:
-    #        from gym.envs.classic_control import rendering
-    #        self.viewer = rendering.Viewer(screen_width, screen_height)
-    #        l,r,t,b = -cartwidth/2, cartwidth/2, cartheight/2, -cartheight/2
-    #        axleoffset =cartheight/4.0
-    #        cart = rendering.FilledPolygon([(l,b), (l,t), (r,t), (r,b)])
-    #        self.carttrans = rendering.Transform()
-    #        cart.add_attr(self.carttrans)
-    #        self.viewer.add_geom(cart)
-    #        l,r,t,b = -polewidth/2,polewidth/2,polelen-polewidth/2,-polewidth/2
-    #        pole = rendering.FilledPolygon([(l,b), (l,t), (r,t), (r,b)])
-    #        pole.set_color(.8,.6,.4)
-    #        self.poletrans = rendering.Transform(translation=(0, axleoffset))
-    #        pole.add_attr(self.poletrans)
-    #        pole.add_attr(self.carttrans)
-    #        self.viewer.add_geom(pole)
-    #        self.axle = rendering.make_circle(polewidth/2)
-    #        self.axle.add_attr(self.poletrans)
-    #        self.axle.add_attr(self.carttrans)
-    #        self.axle.set_color(.5,.5,.8)
-    #        self.viewer.add_geom(self.axle)
-    #        self.track = rendering.Line((0,carty), (screen_width,carty))
-    #        self.track.set_color(0,0,0)
-    #        self.viewer.add_geom(self.track)
+    def render(self, mode='human'):
+        field_col = self.field_width
+        field_row = self.field_height
+        field = self.field
+        current_tsumo = self.current_tsumo
+        # print('field:',field)
+        # print('tsumo:',current_tsumo)
 
-    #    if self.state is None: return None
+        screen_width = 600
+        screen_height = 600
+        # ツモ表示エリアが上にあって、その下にフィールドがある
+        tsumo_area_height = 40
+        scale = min(
+            screen_width / self.field_width,
+            screen_width / (self.field_height + tsumo_area_height)
+        )
+        puyo_size = math.floor(scale)
 
-    #    x = self.state
-    #    cartx = x[0]*scale+screen_width/2.0 # MIDDLE OF CART
-    #    self.carttrans.set_translation(cartx, carty)
-    #    self.poletrans.set_rotation(-x[2])
+        tsumo_ox = (screen_width - field_col * puyo_size) / 2
+        tsumo_oy = (screen_height - field_row * puyo_size) / 2
+        field_ox = tsumo_ox
+        field_oy = tsumo_oy + tsumo_area_height
+        field_width = field_col * puyo_size
+        field_height = field_row * puyo_size
+        tsumo_area_width = field_width
+        # tsumo_area_height = 定義済み
 
-    #    return self.viewer.render(return_rgb_array = mode=='rgb_array')
+        if self.viewer is None:
+            from gym.envs.classic_control import rendering
+            self.viewer = rendering.Viewer(screen_width, screen_height)
+
+        # tsumo puyo
+        l,r,t,b = tsumo_ox, tsumo_ox + tsumo_area_width, tsumo_oy, tsumo_oy + tsumo_area_height
+        self.viewer.draw_polygon(self._rect_geom(l,r,t,b), filled=True, color=(1,1,1))
+        for i, tsumo in enumerate(current_tsumo):
+          space = 5
+          size = min(puyo_size, ((tsumo_area_height - space * 2) / 2))
+          oxoy = tsumo_ox + (size + space) * i, tsumo_oy + space
+          self._draw_puyos(self.viewer, np.reshape(tsumo, (1,2)), oxoy, size)
+
+        # field puyo
+        self._draw_puyos(self.viewer, field, [field_ox, field_oy], puyo_size)
+
+        # draw field
+        field_color = (.5,.5,.5)
+        l,r,t,b = field_ox, field_ox + field_width, field_oy, field_oy + field_height
+        #self.viewer.draw_polyline(self._rect_geom(l,r,t,b), color=field_color)
+        self.viewer.draw_polygon(self._rect_geom(l,r,t,b), filled=False, color=field_color)
+        # 縦線
+        for c in range(field_col):
+            x = field_ox + c * puyo_size
+            self.viewer.draw_polyline([(x, field_oy), (x, field_oy + field_height)], color=field_color)
+        # 横線
+        for r in range(field_row):
+            y = field_oy + r * puyo_size
+            self.viewer.draw_polyline([(field_ox, y), (field_ox + field_width, y)], color=field_color)
+
+        return self.viewer.render(return_rgb_array = mode=='rgb_array')
 
     def close(self):
         if self.viewer: self.viewer.close()
