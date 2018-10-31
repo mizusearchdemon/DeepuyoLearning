@@ -224,7 +224,7 @@ class PuyoEnv(gym.Env):
     def put_current_tsumo(self, line, rotate):
         for i in range(2):
             if self.height[line] < self.field_height - 1:
-                self.field[line][self.height[line]] = self.current_tsumo[0][0]
+                self.field[line][self.height[line]] = self.current_tsumo[0][i]
                 self.height[line] += 1
             if rotate == 1: line += 1
             elif rotate == 3: line -= 1
