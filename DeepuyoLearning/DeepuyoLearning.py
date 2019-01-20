@@ -12,7 +12,6 @@ import cupy
 # Set up the logger to print info messages for understandability.
 import logging
 import sys
-gym.undo_logger_setup()  # Turn off gym's default logger settings
 logging.basicConfig(level=logging.INFO, stream=sys.stdout, format='')
 
 import puyoenv
@@ -46,7 +45,7 @@ def test():
     pe = puyoenv.PuyoEnv(field = field)
     print(pe.field_to_url())
 
-    rensa, point = pe.exec_rensa()  # 18連鎖, 159180点
+    rensa, point = pe.exec_rensa(need_render = True)  # 18連鎖, 159180点
     h = pe.get_reachable_height
     print(rensa, point)
 

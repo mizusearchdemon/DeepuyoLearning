@@ -5,6 +5,7 @@ from gym import spaces, logger
 from gym.utils import seeding
 import numpy as np
 import math
+import time
 
 #import cupy as np
 
@@ -164,7 +165,7 @@ class PuyoEnv(gym.Env):
                 r,b = l + puyo_size, t + puyo_size
                 self.viewer.draw_polygon(self._rect_geom(l,r,t,b), color=self.colors[color])
 
-    def render(self, mode='human'):
+    def render(self, mode = 'human', render_interval_sec = 0.5):
         field_col = self.field_width
         field_row = self.field_height
         field = self.field
@@ -221,7 +222,15 @@ class PuyoEnv(gym.Env):
             y = field_oy + r * puyo_size
             self.viewer.draw_polyline([(field_ox, y), (field_ox + field_width, y)], color=field_color)
 
-        return self.viewer.render(return_rgb_array = mode=='rgb_array')
+        ret = self.viewer.render(return_rgb_array = mode=='rgb_array')
+
+        if mode == 'human':
+            if render_interval_sec >= 0:
+                time.sleep(render_interval_sec)
+            else:
+                input()
+
+        return ret
 
     def close(self):
         if self.viewer: self.viewer.close()
@@ -297,7 +306,7 @@ class PuyoEnv(gym.Env):
             self.height[w] = h_blank
         return
 
-    def exec_rensa(self):
+    def exec_rensa(self, need_render = False, render_interval_sec = 0.5):
         rensa = 0
         point = 0
 
@@ -305,7 +314,11 @@ class PuyoEnv(gym.Env):
         field_width = self.field_width
         field_height = self.field_height
         
+        if need_render:
+            self.render(mode = 'human', render_interval_sec = render_interval_sec)
         self.fall_puyo()
+        if need_render:
+            self.render(mode = 'human', render_interval_sec = render_interval_sec)
 
         while True:
             #print(self.field)
@@ -353,7 +366,11 @@ class PuyoEnv(gym.Env):
             point += total_num_of_delete_puyos * 10 * max((rensa_bonus + combination_bonus + color_bonus), 1)
 
             # 浮いたぷよを落下
+            if need_render:
+                self.render(mode = 'human', render_interval_sec = render_interval_sec)
             self.fall_puyo()
+            if need_render:
+                self.render(mode = 'human', render_interval_sec = render_interval_sec)
 
             rensa += 1
             #print("rensa = ", rensa, "ppint = ", point)
